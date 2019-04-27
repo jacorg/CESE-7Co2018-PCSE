@@ -51,6 +51,9 @@
 
 
 #define FILENAME "SDC:/hola.txt"
+#define N 1024
+#define INIT 0
+
 static FATFS fs;           // <-- FatFs work area needed for each volume
 static FIL fp;             // <-- File object needed for each open file
 /*==================[internal data declaration]==============================*/
@@ -86,9 +89,6 @@ fsmButtonStateBoard_t fsmButtonStateTEC4;
 /* FUNCION PRINCIPAL, PUNTO DE ENTRADA AL PROGRAMA LUEGO DE RESET. */
 int main(void){
    /* ------------- INICIALIZACIONES ------------- */
-
-
-
 
    /*Board Config*/
    boardConfig();
@@ -129,32 +129,16 @@ int main(void){
 
 
    uint8_t msj[40];   //msj to save the filename
+   uint8_t * dataIn = malloc(N * sizeof(uint8_t));// buffer recepción UART
    uint8_t dato;
-
-
-   uint16_t pp=5555;
-   uint8_t uartBuff[10];
-
-
    delay_t delayLedInit;
    delay_t delayLedStop;
    tm Current_time;
-
-   uint16_t i=0;
+   uint16_t i=0;                                   //index for save dataIn
 
    //delayConfig( &delayTec, 40 );
    delayInit( &delayLedInit, 200 );
    delayInit( &delayLedStop, 1000 );
-
-/*   f_open( &fp, FILENAME, FA_WRITE | FA_OPEN_APPEND );
-   	    	 for(i=0;i<1000;i++){
-   	    		itoa(i, uartBuff, 10);
-   	    		strcat (uartBuff, "\r\n");
-   	    	 f_write( &fp,uartBuff,strlen(uartBuff), &nbytes );
-  // 	    	 delay(20);
-   	    	 gpioToggle(LED2);}
-   f_close(&fp);
-*/
 
    printf("Entrando a modo Init. Presione TEC1 para iniciar. \r\n");
    /* ------------- REPETIR POR SIEMPRE ------------- */
@@ -168,64 +152,35 @@ int main(void){
 	      case init:
 	    	 if(delayRead(&delayLedInit))
 	    	   gpioToggle(LED1);
+	    	 i=INIT;
 	      break;
 
 	      case adq:
 	    	  /* Si recibe un byte de la UART_USB lo guardarlo en la variable dato. */
 	    	   if(  uartReadByte( UART_USB, &dato )){
-	    		   printf("recibiendo byte n:%d\r\n",i);
-	    	       /* Se reenvíael dato a la UART_USB realizando un eco de lo que llega */
-	    		   //uartWriteByte( UART_USB, dato);
-
-	    		   if(i<2048 && i>0){
-	    		  	 if( f_open( &fp, msj, FA_WRITE | FA_OPEN_APPEND ) == FR_OK ){
-//	   		    	 itoa(pp, uartBuff, 10);
-	    		     uartBuff[0]=dato;
-	    		     uartBuff[1]='\0';
-	    		     strcat (uartBuff, "\r\n");
-	    		  	 f_write( &fp,uartBuff,strlen(uartBuff), &nbytes );
-	    		     f_close(&fp);
-
-	    		     if( nbytes == strlen(uartBuff) ){
-	    		  	 // Turn ON LEDG if the write operation was successful
-	    		  	  gpioToggle(LEDB);
-	    		  	  }
-	    		     else
-	    		    	 gpioWrite(LEDR,ON);
-	    		  	 }
-	    		  	  i++;
-	    		   }
-
-	    		   else if(i==0){
-	    		   //Get hour and print it
-	    		   	  if (ds3231_getTime(&Current_time)){
-	    		   	  nameFile(msj, &Current_time);
-	    		   	  printf("archivo a guardar en microSD %s \r\n",msj);
-
-
-	    		   	  if( f_open( &fp, msj, FA_WRITE | FA_OPEN_APPEND ) == FR_OK ){
- //       		   	  itoa(pp, uartBuff, 10);
-	    		   	uartBuff[0]=dato;
-	    		   	  uartBuff[1]='\0';
-	    		   	  strcat (uartBuff, "\r\n");
-	    		   	  f_write( &fp,uartBuff,strlen(uartBuff), &nbytes );
-	    		   	  f_close(&fp);
-
-	    		      if( nbytes == strlen(uartBuff) ){
-	    		   	  // Turn ON LEDG if the write operation was successful
-	    		   	  gpioToggle(LEDB);
-	    		   	  }
-	    		      else
-	    		        gpioWrite(LEDR,ON);
-	    		   	  }
-	    		   	  i++;
-	    		   	  }
-	    		   }
-	    		   else
-	    	 	       i=0;
-
-
+	    		   *(dataIn+i)=dato;
+	    		   i++;
 	    	   }
+
+	    	   // Si el buffer interno de recepción se lleno comprimo y copio los datos.
+	    	   if(i==N)                               // Buffer lleno entonces vuelco a memoria
+	    	     if (ds3231_getTime(&Current_time)){  //Lectura DS3231
+	    	       printf("El bloque de datos se recibio correctamente\r\n");
+	    	       nameFile(msj, &Current_time);      //genero string con formato SSS_AAAA_MM_DD_HH_mm_SS.txt
+	    	       		  	 	 	 	 	 	 	  // donde SSS:nombre estacion, A:año, M:mes, DD:día, H:hora, mm:minutos, SS:segundos
+	    	       printf("Archivo a guardar en microSD %s \r\n",msj);
+
+	    	       //Creo archivo
+	    	       if( f_open( &fp, msj, FA_WRITE | FA_OPEN_APPEND ) == FR_OK )
+	    	       	  f_write( &fp,dataIn,N, &nbytes );
+	    	       if( nbytes == N)
+	    	       	  gpioToggle(LED2);
+
+	    	       f_close(&fp);
+	    	       i=INIT; // preparo para recibir otro bloque de datos
+	    	       printf("datos grabados correctamente\n");
+	    	       }// end ds3231
+
 	    	   if(delayRead(&delayLedStop))
 	    	     gpioToggle(LED3);
 	      break;
