@@ -1,7 +1,6 @@
-/* Copyright 2016, Alejandro Permingeat.
- * Copyright 2016, Eric Pernia.
+/* Copyright 2016, Eric Pernia.
  * Copyright 2018, Sergio Renato De Jesus Melean <sergiordj@gmail.com>.
- *
+ * Copyright 2018, Jacobo Omar Salvador <jacosalvador@gmail.com>.
  * All rights reserved.
  *
  * This file is part sAPI library for microcontrollers.
